@@ -1,93 +1,59 @@
-document.addEventListener('DOMContentLoaded', function() {
-    let popularityChart = null;
+document.addEventListener('DOMContentLoaded', function () {
+    const refreshBtn = document.getElementById('refreshData');
+    const animeTableBody = document.getElementById('animeTableBody');
+    const sourceFilter = document.getElementById('sourceFilter');
 
-    // Fetch anime data and update the display
-    async function fetchAndDisplayAnime() {
-        try {
-            const response = await fetch('/api/anime');
-            const data = await response.json();
-            updateTable(data);
-            updateChart(data);
-        } catch (error) {
-            console.error('Error fetching anime data:', error);
-        }
+    // Fetch and render anime data
+    function fetchAnimeData(source = 'all') {
+        fetch('/api/anime')
+            .then(res => res.json())
+            .then(data => {
+                // Filter if needed
+                const filtered = source === 'all' ? data : data.filter(a => a.source === source);
+                renderTable(filtered);
+            });
     }
 
-    // Update the table with anime data
-    function updateTable(data) {
-        const tbody = document.getElementById('animeTableBody');
-        tbody.innerHTML = '';
-
-        data.forEach((anime, index) => {
+    function renderTable(animeList) {
+        animeTableBody.innerHTML = '';
+        animeList.forEach(anime => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${index + 1}</td>
+                <td>${anime.rank}</td>
                 <td>${anime.title}</td>
-                <td>${anime.members.toLocaleString()}</td>
-                <td>${anime.score ? anime.score.toFixed(2) : 'N/A'}</td>
+                <td>${anime.members}</td>
+                <td>${anime.score}</td>
                 <td>${anime.source}</td>
             `;
-            tbody.appendChild(row);
+            animeTableBody.appendChild(row);
         });
     }
 
-    // Update the popularity chart
-    function updateChart(data) {
-        const ctx = document.getElementById('popularityChart').getContext('2d');
-        
-        // Destroy existing chart if it exists
-        if (popularityChart) {
-            popularityChart.destroy();
-        }
-
-        // Prepare data for chart
-        const labels = data.slice(0, 10).map(anime => anime.title);
-        const members = data.slice(0, 10).map(anime => anime.members);
-
-        popularityChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Member Count',
-                    data: members,
-                    backgroundColor: 'rgba(52, 152, 219, 0.8)',
-                    borderColor: 'rgba(52, 152, 219, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    }
-
-    // Handle refresh button click
-    document.getElementById('refreshData').addEventListener('click', async () => {
-        try {
-            const response = await fetch('/api/update', {
-                method: 'POST'
+    // Refresh button event
+    refreshBtn.addEventListener('click', function () {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Refreshing...";
+        fetch('/api/update', { method: 'POST' })
+            .then(res => res.json())
+            .then(result => {
+                // Optionally show a success message
+                fetchAnimeData(sourceFilter.value);
+            })
+            .catch(err => {
+                alert('Error refreshing data!');
+                console.error(err);
+            })
+            .finally(() => {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = "Refresh Data";
             });
-            const result = await response.json();
-            if (result.status === 'success') {
-                fetchAndDisplayAnime();
-            }
-        } catch (error) {
-            console.error('Error updating data:', error);
-        }
     });
 
-    // Handle source filter changes
-    document.getElementById('sourceFilter').addEventListener('change', function(e) {
-        const source = e.target.value;
-        fetchAndDisplayAnime(source);
+    // Source filter event
+    sourceFilter.addEventListener('change', function () {
+        fetchAnimeData(this.value);
     });
 
-    // Initial data load
-    fetchAndDisplayAnime();
+    // On load fetch data
+    fetchAnimeData();
 });
